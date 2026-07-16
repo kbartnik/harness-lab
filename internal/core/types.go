@@ -3,7 +3,9 @@
 // provider, tool, and loop packages.
 package core
 
-import "time"
+import (
+	"time"
+)
 
 type Role string // "user" | "assistant" | "tool"
 
