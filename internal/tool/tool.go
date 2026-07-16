@@ -77,3 +77,41 @@ func classifyFileError(err error) *ToolError {
 		return nil
 	}
 }
+
+type Write struct {
+	Root string
+}
+
+func (w Write) Name() string {
+	return "write"
+}
+
+func (w Write) Schema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"path":    map[string]any{"type": "string"},
+			"content": map[string]any{"type": "string"},
+		},
+		"required": []string{"path", "content"},
+	}
+}
+
+func (w Write) Execute(args map[string]any) (core.ToolResult, error) {
+	path := args["path"].(string)
+
+	resolvedPath, err := resolveInSandbox(w.Root, path)
+	if err != nil {
+		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, err
+	}
+
+	content := args["content"].(string)
+	err = os.WriteFile(resolvedPath, []byte(content), 0o644)
+	if err != nil {
+		if toolErr := classifyFileError(err); toolErr != nil {
+			return core.ToolResult{ToolCallID: "", Output: toolErr.Error(), IsError: true}, toolErr
+		}
+		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, err
+	}
+	return core.ToolResult{ToolCallID: "", Output: "", IsError: false}, nil
+}

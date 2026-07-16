@@ -80,3 +80,44 @@ func TestRead_Execute(t *testing.T) {
 		assert.Equal(t, "", result.Output)
 	})
 }
+
+func TestWrite_Execute(t *testing.T) {
+	t.Run("writes file to sandbox", func(t *testing.T) {
+		root := t.TempDir()
+		w := Write{Root: root}
+
+		result, err := w.Execute(map[string]any{"path": "foo.txt", "content": "hello"})
+		require.NoError(t, err)
+
+		assert.False(t, result.IsError)
+
+		written, err := os.ReadFile(filepath.Join(root, "foo.txt"))
+		require.NoError(t, err)
+
+		assert.Equal(t, "hello", string(written))
+	})
+
+	t.Run("sandbox violation", func(t *testing.T) {
+		root := t.TempDir()
+		w := Write{Root: root}
+
+		result, err := w.Execute(map[string]any{"path": "../../etc/passwd", "content": "malicious"})
+		require.Error(t, err)
+
+		assert.True(t, result.IsError)
+		assert.True(t, strings.HasPrefix(result.Output, "sandbox_violation:"))
+	})
+
+	t.Run("permission denied", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(root, "unreachable.txt"), []byte{}, 0o644))
+		require.NoError(t, os.Chmod(filepath.Join(root, "unreachable.txt"), 0o444))
+		w := Write{Root: root}
+
+		result, err := w.Execute(map[string]any{"path": "unreachable.txt", "content": "hello"})
+		require.Error(t, err)
+
+		assert.True(t, result.IsError)
+		assert.True(t, strings.HasPrefix(result.Output, "permission_denied:"))
+	})
+}
