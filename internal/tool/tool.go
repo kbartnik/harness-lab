@@ -53,14 +53,27 @@ func (r Read) Execute(args map[string]any) (core.ToolResult, error) {
 	path := args["path"].(string)
 
 	resolvedPath, err := resolveInSandbox(r.Root, path)
-	if err != nil || len(resolvedPath) == 0 {
+	if err != nil {
 		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, err
 	}
 
 	contentBytes, err := os.ReadFile(resolvedPath)
-	if err != nil || len(contentBytes) == 0 {
+	if err != nil {
+		if toolErr := classifyFileError(err); toolErr != nil {
+			return core.ToolResult{ToolCallID: "", Output: toolErr.Error(), IsError: true}, toolErr
+		}
 		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, err
 	}
-
 	return core.ToolResult{ToolCallID: "", Output: string(contentBytes), IsError: false}, nil
+}
+
+func classifyFileError(err error) *ToolError {
+	switch {
+	case os.IsNotExist(err):
+		return &ToolError{KindNotFound, err}
+	case os.IsPermission(err):
+		return &ToolError{KindPermissionDenied, err}
+	default:
+		return nil
+	}
 }
