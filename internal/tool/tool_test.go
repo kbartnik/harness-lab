@@ -77,6 +77,7 @@ func TestRead_Execute(t *testing.T) {
 	t.Run("empty file", func(t *testing.T) {
 		r, root := newRead(t)
 
+		// create a zero-byte file at root
 		require.NoError(t, os.WriteFile(filepath.Join(root, "empty.txt"), []byte{}, 0o644))
 
 		result, err := r.Execute(map[string]any{"path": "empty.txt"})
@@ -89,6 +90,7 @@ func TestRead_Execute(t *testing.T) {
 	t.Run("permission denied", func(t *testing.T) {
 		r, root := newRead(t)
 
+		// create a zero byte file with the read bit unset
 		require.NoError(t, os.WriteFile(filepath.Join(root, "noaccess.txt"), []byte{}, 0o200))
 		require.NoError(t, os.Chmod(filepath.Join(root, "noaccess.txt"), 0o200))
 
@@ -140,6 +142,7 @@ func TestWrite_Execute(t *testing.T) {
 	t.Run("permission denied", func(t *testing.T) {
 		w, root := newWrite(t)
 
+		// create a zero-byte file with the read bit unset
 		require.NoError(t, os.WriteFile(filepath.Join(root, "unreachable.txt"), []byte{}, 0o644))
 		require.NoError(t, os.Chmod(filepath.Join(root, "unreachable.txt"), 0o444))
 
