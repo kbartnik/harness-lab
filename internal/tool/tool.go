@@ -12,6 +12,7 @@ import (
 
 type Tool interface {
 	Name() string
+	Description() string
 	Schema() map[string]any
 	Execute(args map[string]any) (core.ToolResult, error)
 }
@@ -45,6 +46,10 @@ type Read struct {
 
 func (r Read) Name() string {
 	return "read"
+}
+
+func (r Read) Description() string {
+	return "read a file"
 }
 
 func (r Read) Schema() map[string]any {
@@ -95,6 +100,10 @@ type Write struct {
 
 func (w Write) Name() string {
 	return "write"
+}
+
+func (w Write) Description() string {
+	return "write a file"
 }
 
 func (w Write) Schema() map[string]any {

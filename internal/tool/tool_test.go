@@ -175,3 +175,19 @@ func TestWrite_Execute(t *testing.T) {
 		assert.Equal(t, KindInvalidArgument, toolErr.Kind)
 	})
 }
+
+func TestWrite_Description(t *testing.T) {
+	w, _ := newWrite(t)
+
+	result := w.Description()
+
+	assert.NotEmpty(t, result)
+}
+
+func TestRead_Description(t *testing.T) {
+	r, _ := newRead(t)
+
+	result := r.Description()
+
+	assert.NotEmpty(t, result)
+}
