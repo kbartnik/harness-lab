@@ -31,6 +31,14 @@ func resolveInSandbox(root, requested string) (string, error) {
 	return full, nil
 }
 
+func requireStringArg(args map[string]any, key string) (string, error) {
+	val, ok := args[key].(string)
+	if !ok {
+		return "", &ToolError{Kind: KindInvalidArgument, Err: fmt.Errorf("missing or invalid %q argument", key)}
+	}
+	return val, nil
+}
+
 type Read struct {
 	Root string
 }
@@ -50,19 +58,22 @@ func (r Read) Schema() map[string]any {
 }
 
 func (r Read) Execute(args map[string]any) (core.ToolResult, error) {
-	path := args["path"].(string)
+	path, err := requireStringArg(args, "path")
+	if err != nil {
+		return core.ToolResult{}, err
+	}
 
 	resolvedPath, err := resolveInSandbox(r.Root, path)
 	if err != nil {
-		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, err
+		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, nil
 	}
 
 	contentBytes, err := os.ReadFile(resolvedPath)
 	if err != nil {
 		if toolErr := classifyFileError(err); toolErr != nil {
-			return core.ToolResult{ToolCallID: "", Output: toolErr.Error(), IsError: true}, toolErr
+			return core.ToolResult{ToolCallID: "", Output: toolErr.Error(), IsError: true}, nil
 		}
-		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, err
+		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, nil
 	}
 	return core.ToolResult{ToolCallID: "", Output: string(contentBytes), IsError: false}, nil
 }
@@ -98,20 +109,27 @@ func (w Write) Schema() map[string]any {
 }
 
 func (w Write) Execute(args map[string]any) (core.ToolResult, error) {
-	path := args["path"].(string)
+	path, err := requireStringArg(args, "path")
+	if err != nil {
+		return core.ToolResult{}, err
+	}
 
 	resolvedPath, err := resolveInSandbox(w.Root, path)
 	if err != nil {
-		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, err
+		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, nil
 	}
 
-	content := args["content"].(string)
+	content, err := requireStringArg(args, "content")
+	if err != nil {
+		return core.ToolResult{}, err
+	}
+
 	err = os.WriteFile(resolvedPath, []byte(content), 0o644)
 	if err != nil {
 		if toolErr := classifyFileError(err); toolErr != nil {
-			return core.ToolResult{ToolCallID: "", Output: toolErr.Error(), IsError: true}, toolErr
+			return core.ToolResult{ToolCallID: "", Output: toolErr.Error(), IsError: true}, nil
 		}
-		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, err
+		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, nil
 	}
 	return core.ToolResult{ToolCallID: "", Output: "", IsError: false}, nil
 }

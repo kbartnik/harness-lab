@@ -8,6 +8,7 @@ const (
 	KindSandboxViolation ErrorKind = "sandbox_violation"
 	KindNotFound         ErrorKind = "not_found"
 	KindPermissionDenied ErrorKind = "permission_denied"
+	KindInvalidArgument  ErrorKind = "invalid_argument"
 )
 
 type ToolError struct {
