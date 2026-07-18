@@ -3,6 +3,7 @@ package provider
 import (
 	"testing"
 
+	"github.com/kbartnik/harness-lab/internal/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -71,5 +72,54 @@ func TestResultFromResponse(t *testing.T) {
 		result := resultFromResponse(resp)
 
 		assert.Equal(t, "here are the contents of foo.txt", result.Message.Text)
+	})
+}
+
+func TestAnthropicMessageFromCore(t *testing.T) {
+	t.Run("user message", func(t *testing.T) {
+		msg := core.Message{
+			Role: "user",
+			Text: "Read foo.txt and tell me what it says.",
+		}
+
+		result := anthropicMessageFromCore(msg)
+
+		assert.Equal(t, "user", result.Role)
+		assert.Equal(t, []anthropicContentBlock{
+			{Type: "text", Text: "Read foo.txt and tell me what it says."},
+		}, result.Content)
+	})
+
+	t.Run("assistant message with test and tool call", func(t *testing.T) {
+		msg := core.Message{
+			Role: "assistant",
+			Text: "I'll read that file for you.",
+			ToolCalls: []core.ToolCall{
+				{ID: "toolu01Xyz", Name: "read", Args: map[string]any{"path": "foo.txt"}},
+			},
+		}
+
+		result := anthropicMessageFromCore(msg)
+
+		assert.Equal(t, "assistant", result.Role)
+		assert.Equal(t, []anthropicContentBlock{
+			{Type: "text", Text: "I'll read that file for you."},
+			{Type: "tool_use", ID: "toolu01Xyz", Name: "read", Input: map[string]any{"path": "foo.txt"}},
+		}, result.Content)
+	})
+
+	t.Run("tool result message", func(t *testing.T) {
+		msg := core.Message{
+			Role:       "tool",
+			ToolCallID: "toolu01Xyz",
+			Text:       "the file's contents go here.",
+		}
+
+		result := anthropicMessageFromCore(msg)
+
+		assert.Equal(t, "user", result.Role)
+		assert.Equal(t, []anthropicContentBlock{
+			{Type: "tool_result", ToolUseID: "toolu01Xyz", Content: "the file's contents go here."},
+		}, result.Content)
 	})
 }

@@ -81,3 +81,43 @@ func resultFromResponse(resp anthropicResponse) Result {
 		OutputTokens: resp.Usage.OutputTokens,
 	}
 }
+
+func anthropicMessageFromCore(m core.Message) anthropicMessage {
+	var role string
+	var content []anthropicContentBlock
+
+	switch m.Role {
+	case "user":
+		role = "user"
+		content = []anthropicContentBlock{
+			{
+				Type: "text",
+				Text: m.Text,
+			},
+		}
+
+	case "tool":
+		role = "user"
+		content = []anthropicContentBlock{
+			{
+				Type:      "tool_result",
+				ToolUseID: m.ToolCallID,
+				Content:   m.Text,
+			},
+		}
+
+	case "assistant":
+		role = "assistant"
+		if m.Text != "" {
+			content = append(content, anthropicContentBlock{Type: "text", Text: m.Text})
+		}
+		for _, call := range m.ToolCalls {
+			content = append(content, anthropicContentBlock{Type: "tool_use", ID: call.ID, Name: call.Name, Input: call.Args})
+		}
+	}
+
+	return anthropicMessage{
+		Role:    role,
+		Content: content,
+	}
+}
