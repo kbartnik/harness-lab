@@ -1,9 +1,20 @@
 package provider
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http"
 	"strings"
 
 	"github.com/kbartnik/harness-lab/internal/core"
+	"github.com/kbartnik/harness-lab/internal/tool"
+)
+
+var anthropicAPIURL = "https://api.anthropic.com/v1/messages"
+
+const (
+	anthropicModel     = "claude-sonnet-4-5"
+	anthropicMaxTokens = 4096
 )
 
 type anthropicRequest struct {
@@ -120,4 +131,44 @@ func anthropicMessageFromCore(m core.Message) anthropicMessage {
 		Role:    role,
 		Content: content,
 	}
+}
+
+func AnthropicSendMessage(messages []core.Message, tools []tool.Tool, apiKey string) (Result, error) {
+	anthropicMessages := make([]anthropicMessage, 0, len(messages))
+	for _, m := range messages {
+		anthropicMessages = append(anthropicMessages, anthropicMessageFromCore(m))
+	}
+
+	reqBody := anthropicRequest{
+		Model:     anthropicModel,
+		MaxTokens: anthropicMaxTokens,
+		Messages:  anthropicMessages,
+	}
+
+	jsonBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return Result{}, err
+	}
+
+	httpReq, err := http.NewRequest("POST", anthropicAPIURL, bytes.NewReader(jsonBytes))
+	if err != nil {
+		return Result{}, err
+	}
+
+	httpReq.Header.Set("x-api-key", apiKey)
+	httpReq.Header.Set("anthropic-version", "2023-06-01")
+	httpReq.Header.Set("content-type", "application/json")
+
+	httpResp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return Result{}, err
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	var anthropicResp anthropicResponse
+	if err := json.NewDecoder(httpResp.Body).Decode(&anthropicResp); err != nil {
+		return Result{}, err
+	}
+
+	return resultFromResponse(anthropicResp), nil
 }

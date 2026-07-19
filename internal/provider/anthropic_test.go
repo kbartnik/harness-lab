@@ -1,10 +1,14 @@
 package provider
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/kbartnik/harness-lab/internal/core"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResultFromResponse(t *testing.T) {
@@ -121,5 +125,40 @@ func TestAnthropicMessageFromCore(t *testing.T) {
 		assert.Equal(t, []anthropicContentBlock{
 			{Type: "tool_result", ToolUseID: "toolu01Xyz", Content: "the file's contents go here."},
 		}, result.Content)
+	})
+}
+
+func setupTestServer(t *testing.T, resp anthropicResponse) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			t.Fatalf("failed to encode test response: %v", err)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	original := anthropicAPIURL
+	anthropicAPIURL = server.URL
+	t.Cleanup(func() { anthropicAPIURL = original })
+}
+
+func TestAnthropicSendMessage(t *testing.T) {
+	t.Run("sends message and parses text response", func(t *testing.T) {
+		setupTestServer(t, anthropicResponse{
+			Content: []anthropicContentBlock{
+				{Type: "text", Text: "here are the contents of foo.txt"},
+			},
+			StopReason: "end_turn",
+			Usage:      anthropicUsage{InputTokens: 10, OutputTokens: 5},
+		})
+
+		result, err := AnthropicSendMessage([]core.Message{
+			{Role: "user", Text: "read foo.txt"},
+		}, nil, "fake-api-key")
+		require.NoError(t, err)
+
+		assert.Equal(t, "here are the contents of foo.txt", result.Message.Text)
+		assert.Equal(t, "end_turn", result.StopReason)
+		assert.Equal(t, 10, result.InputTokens)
+		assert.Equal(t, 5, result.OutputTokens)
 	})
 }

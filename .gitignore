@@ -1,3 +1,4 @@
 /sandbox/
 *.env
 /harness-lab
+.DS_Store
