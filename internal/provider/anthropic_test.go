@@ -2,11 +2,13 @@ package provider
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/kbartnik/harness-lab/internal/core"
+	"github.com/kbartnik/harness-lab/internal/tool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,9 +59,6 @@ func TestResultFromResponse(t *testing.T) {
 	})
 
 	t.Run("skips unrecognized block types", func(t *testing.T) {
-		//TODO: build an anthropicResponse whose content includes a
-		//{"type": "thinking", ...}-shaped block alongside a normal
-		//"text" block.
 		resp := anthropicResponse{
 			Content: []anthropicContentBlock{
 				{
@@ -128,8 +127,24 @@ func TestAnthropicMessageFromCore(t *testing.T) {
 	})
 }
 
-func setupTestServer(t *testing.T, resp anthropicResponse) {
+type capturedRequest struct {
+	req  *http.Request
+	body []byte
+}
+
+func setupTestServer(t *testing.T, resp anthropicResponse) *capturedRequest {
+	t.Helper()
+
+	captured := &capturedRequest{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured.req = r
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read request body: %v", err)
+		}
+
+		captured.body = body
+
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			t.Fatalf("failed to encode test response: %v", err)
 		}
@@ -139,11 +154,13 @@ func setupTestServer(t *testing.T, resp anthropicResponse) {
 	original := anthropicAPIURL
 	anthropicAPIURL = server.URL
 	t.Cleanup(func() { anthropicAPIURL = original })
+
+	return captured
 }
 
 func TestAnthropicSendMessage(t *testing.T) {
 	t.Run("sends message and parses text response", func(t *testing.T) {
-		setupTestServer(t, anthropicResponse{
+		captured := setupTestServer(t, anthropicResponse{
 			Content: []anthropicContentBlock{
 				{Type: "text", Text: "here are the contents of foo.txt"},
 			},
@@ -156,9 +173,67 @@ func TestAnthropicSendMessage(t *testing.T) {
 		}, nil, "fake-api-key")
 		require.NoError(t, err)
 
+		assert.Equal(t, "fake-api-key", captured.req.Header.Get("x-api-key"))
+		assert.Equal(t, "2023-06-01", captured.req.Header.Get("anthropic-version"))
+		assert.Equal(t, "application/json", captured.req.Header.Get("content-type"))
 		assert.Equal(t, "here are the contents of foo.txt", result.Message.Text)
 		assert.Equal(t, "end_turn", result.StopReason)
 		assert.Equal(t, 10, result.InputTokens)
 		assert.Equal(t, 5, result.OutputTokens)
 	})
+
+	t.Run("includes tools in request body", func(t *testing.T) {
+		captured := setupTestServer(t, anthropicResponse{
+			Content:    []anthropicContentBlock{{Type: "text", Text: "ok"}},
+			StopReason: "end_turn",
+		})
+
+		_, err := AnthropicSendMessage([]core.Message{
+			{Role: "user", Text: "read foo.txt"},
+		}, []tool.Tool{tool.Read{}}, "fake-api-key")
+		require.NoError(t, err)
+
+		var sentReq anthropicRequest
+		require.NoError(t, json.Unmarshal(captured.body, &sentReq))
+
+		require.Len(t, sentReq.Tools, 1)
+		assert.Equal(t, "read", sentReq.Tools[0].Name)
+		assert.Equal(t, "read a file", sentReq.Tools[0].Description)
+
+		wantSchemaBytes, err := json.Marshal(tool.Read{}.Schema())
+		require.NoError(t, err)
+		var wantSchema map[string]any
+		require.NoError(t, json.Unmarshal(wantSchemaBytes, &wantSchema))
+
+		assert.Equal(t, wantSchema, sentReq.Tools[0].InputSchema)
+	})
+
+	t.Run("returns error on non-2xx response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte("invalid api key"))
+		}))
+		t.Cleanup(server.Close)
+
+		original := anthropicAPIURL
+		anthropicAPIURL = server.URL
+		t.Cleanup(func() { anthropicAPIURL = original })
+
+		_, err := AnthropicSendMessage([]core.Message{{Role: "user", Text: "hi"}}, nil, "bad-key")
+
+		require.Error(t, err)
+		var anthropicErr *AnthropicError
+		require.ErrorAs(t, err, &anthropicErr)
+
+		assert.Equal(t, http.StatusUnauthorized, anthropicErr.StatusCode)
+		assert.Equal(t, "invalid api key", anthropicErr.Body)
+	})
+}
+
+func TestAnthropicToolFromTool(t *testing.T) {
+	result := anthropicToolFromTool(tool.Read{})
+
+	assert.Equal(t, "read", result.Name)
+	assert.Equal(t, "read a file", result.Description)
+	assert.Equal(t, tool.Read{}.Schema(), result.InputSchema)
 }

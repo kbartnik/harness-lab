@@ -3,6 +3,8 @@ package provider
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -63,6 +65,15 @@ type Result struct {
 	StopReason   string       `json:"stop_reason"`
 	InputTokens  int          `json:"input_tokens"`
 	OutputTokens int          `json:"output_tokens"`
+}
+
+type AnthropicError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *AnthropicError) Error() string {
+	return fmt.Sprintf("anthropic api error: status %d: %s", e.StatusCode, e.Body)
 }
 
 func resultFromResponse(resp anthropicResponse) Result {
@@ -133,15 +144,29 @@ func anthropicMessageFromCore(m core.Message) anthropicMessage {
 	}
 }
 
+func anthropicToolFromTool(t tool.Tool) anthropicTool {
+	return anthropicTool{
+		Name:        t.Name(),
+		Description: t.Description(),
+		InputSchema: t.Schema(),
+	}
+}
+
 func AnthropicSendMessage(messages []core.Message, tools []tool.Tool, apiKey string) (Result, error) {
 	anthropicMessages := make([]anthropicMessage, 0, len(messages))
 	for _, m := range messages {
 		anthropicMessages = append(anthropicMessages, anthropicMessageFromCore(m))
 	}
 
+	anthropicTools := make([]anthropicTool, 0, len(tools))
+	for _, t := range tools {
+		anthropicTools = append(anthropicTools, anthropicToolFromTool(t))
+	}
+
 	reqBody := anthropicRequest{
 		Model:     anthropicModel,
 		MaxTokens: anthropicMaxTokens,
+		Tools:     anthropicTools,
 		Messages:  anthropicMessages,
 	}
 
@@ -164,6 +189,11 @@ func AnthropicSendMessage(messages []core.Message, tools []tool.Tool, apiKey str
 		return Result{}, err
 	}
 	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
+		body, _ := io.ReadAll(httpResp.Body)
+		return Result{}, &AnthropicError{StatusCode: httpResp.StatusCode, Body: string(body)}
+	}
 
 	var anthropicResp anthropicResponse
 	if err := json.NewDecoder(httpResp.Body).Decode(&anthropicResp); err != nil {
