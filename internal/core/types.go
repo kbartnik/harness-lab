@@ -1,6 +1,6 @@
-// Package core defines the shared wire and instrumentation types -
-// messages, tool calls and results, and turns - used across the
-// provider, tool, and loop packages.
+// Package core defines the shared types used across the provider, tool, and
+// loop packages: Message and ToolCall/ToolResult for conversation wire format,
+// and Turn for per-iteration instrumentation.
 package core
 
 import (

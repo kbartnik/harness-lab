@@ -1,4 +1,8 @@
-// Package loop contains the agent loop.
+// Package loop implements the agent loop. Run sends the conversation to a
+// model provider, executes any tool calls in the response, appends results,
+// and repeats until the model stops or a tool-iteration limit is reached.
+// Unknown tool names are fed back to the model as error content rather than
+// aborting the loop.
 package loop
 
 import (

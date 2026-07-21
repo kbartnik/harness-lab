@@ -1,4 +1,7 @@
-// Package tool contains the Tool interface and implementations
+// Package tool defines the Tool interface and provides Read and Write
+// implementations that operate within a sandboxed directory. All file access
+// is restricted to a configurable root path; attempts to escape it are
+// returned to the model as sandbox_violation errors rather than hard failures.
 package tool
 
 import (
