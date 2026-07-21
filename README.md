@@ -47,11 +47,25 @@ This is not aimed at replacing Claude Code or any other production agent
 tool — the goal is understanding the mechanisms well enough to design, audit,
 and harden agent tooling built on them, not to compete with mature tools.
 
+## Package architecture
+
+```
+cmd/harness-lab   — REPL entrypoint: wires provider, tools, and loop together
+internal/core     — shared types (Message, ToolCall, ToolResult, Turn)
+internal/provider — Anthropic API client; converts wire format to/from core types
+internal/tool     — Tool interface; Read and Write implementations with sandbox enforcement
+internal/loop     — agent loop: send → execute tools → append → repeat
+```
+
+`core` has no dependencies on other internal packages. `provider` and `tool`
+depend only on `core`. `loop` depends on `core`, `provider`, and `tool`. `cmd`
+depends on all of them.
+
 ## Build stages
 
 | Stage | What it adds | Harness concept |
 |---|---|---|
-| 1 | Naked tool-call loop, one provider, two tools (`read`, `write`) | The five-step loop, sandboxed tool execution |
+| ✅ 1 | Naked tool-call loop, one provider, two tools (`read`, `write`) | The five-step loop, sandboxed tool execution |
 | 2 | Second provider (OpenAI) | Provider/protocol abstraction — normalizing genuinely different tool-call and stop-reason shapes behind one interface |
 | 3 | Naive context resend, observed until output degrades | Context rot, made to happen on purpose before being fixed |
 | 4 | Skill loading | Progressive disclosure — catalog-tier metadata with lazy full-body load |
@@ -61,9 +75,24 @@ and harden agent tooling built on them, not to compete with mature tools.
 Each stage is implemented test-first, with a working, runnable system at the
 end of every stage — not a big-bang build at the end.
 
+## Usage
+
+Requires Go 1.22+ and an Anthropic API key.
+
+```bash
+export ANTHROPIC_API_KEY=your-key-here
+go run ./cmd/harness-lab
+```
+
+The REPL reads from stdin and maintains conversation history across turns.
+Files the model reads or writes are confined to a `sandbox/` directory created
+in the working directory. Type Ctrl-D to exit.
+
 ## Status
 
-Currently in progress. See commit history for the stage currently underway.
+Stage 1 complete. The REPL is functional: single-provider tool-call loop with
+sandboxed file read/write, 77% test coverage, and full godoc. Stage 2 (second
+provider, protocol abstraction) is next.
 
 ## Tech stack
 
