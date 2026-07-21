@@ -79,12 +79,16 @@ func (r Read) Execute(args map[string]any) (core.ToolResult, error) {
 
 	contentBytes, err := os.ReadFile(resolvedPath)
 	if err != nil {
-		if toolErr := classifyFileError(err); toolErr != nil {
-			return errorResult(toolErr.Error()), nil
-		}
-		return errorResult(err.Error()), nil
+		return fileErrorResult(err), nil
 	}
 	return core.ToolResult{Output: string(contentBytes)}, nil
+}
+
+func fileErrorResult(err error) core.ToolResult {
+	if toolErr := classifyFileError(err); toolErr != nil {
+		return errorResult(toolErr.Error())
+	}
+	return errorResult(err.Error())
 }
 
 func classifyFileError(err error) *ToolError {
@@ -139,10 +143,7 @@ func (w Write) Execute(args map[string]any) (core.ToolResult, error) {
 
 	err = os.WriteFile(resolvedPath, []byte(content), 0o644)
 	if err != nil {
-		if toolErr := classifyFileError(err); toolErr != nil {
-			return errorResult(toolErr.Error()), nil
-		}
-		return errorResult(err.Error()), nil
+		return fileErrorResult(err), nil
 	}
 	return core.ToolResult{}, nil
 }
