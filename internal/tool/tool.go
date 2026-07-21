@@ -92,7 +92,7 @@ func requireStringArg(args map[string]any, key string) (string, error) {
 }
 
 // Read implements Tool for reading files within a sandboxed directory. Root is
-// the absolute path to the sandbox; all file access is restricted to it.
+// the path to the sandbox directory; all file access is restricted to it.
 type Read struct {
 	Root string
 }
@@ -137,7 +137,7 @@ func (r Read) Execute(args map[string]any) (core.ToolResult, error) {
 }
 
 // Write implements Tool for writing files within a sandboxed directory. Root is
-// the absolute path to the sandbox; all file access is restricted to it.
+// the path to the sandbox directory; all file access is restricted to it.
 type Write struct {
 	Root string
 }

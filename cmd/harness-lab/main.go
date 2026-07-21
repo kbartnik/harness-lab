@@ -44,9 +44,7 @@ func main() {
 			continue
 		}
 
-		messages = append(messages, core.Message{Role: "user", Text: input})
-
-		result, err := loop.Run(send, tools, messages)
+		result, err := loop.Run(send, tools, append(messages, core.Message{Role: "user", Text: input}))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			fmt.Print("> ")
