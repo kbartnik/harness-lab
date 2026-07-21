@@ -60,6 +60,8 @@ type anthropicResponse struct {
 	Usage      anthropicUsage          `json:"usage"`
 }
 
+// Result is the provider-agnostic outcome of a single model call. It carries
+// the assistant Message, the stop reason, and token usage for the request.
 type Result struct {
 	Message      core.Message `json:"message"`
 	StopReason   string       `json:"stop_reason"`
@@ -67,6 +69,9 @@ type Result struct {
 	OutputTokens int          `json:"output_tokens"`
 }
 
+// AnthropicError is returned when the Anthropic API responds with a non-2xx
+// status. StatusCode and Body are preserved so callers can inspect or log the
+// full API error response.
 type AnthropicError struct {
 	StatusCode int
 	Body       string
@@ -76,6 +81,9 @@ func (e *AnthropicError) Error() string {
 	return fmt.Sprintf("anthropic api error: status %d: %s", e.StatusCode, e.Body)
 }
 
+// resultFromResponse converts an Anthropic API response into a Result.
+// It iterates the content blocks, accumulating text blocks into a single string
+// and collecting tool_use blocks as ToolCalls.
 func resultFromResponse(resp anthropicResponse) Result {
 	var text strings.Builder
 	var toolCalls []core.ToolCall
@@ -104,6 +112,10 @@ func resultFromResponse(resp anthropicResponse) Result {
 	}
 }
 
+// anthropicMessageFromCore converts a core.Message into the Anthropic wire
+// format. Notably, both "user" and "tool" roles map to Anthropic's "user" role —
+// tool results are sent as user-role messages containing a tool_result content
+// block, which is how the Anthropic API expects them.
 func anthropicMessageFromCore(m core.Message) anthropicMessage {
 	var role string
 	var content []anthropicContentBlock
@@ -152,6 +164,10 @@ func anthropicToolFromTool(t tool.Tool) anthropicTool {
 	}
 }
 
+// AnthropicSendMessage sends a conversation to the Anthropic Messages API and
+// returns the result. It converts core types to the Anthropic wire format,
+// makes the HTTP request, and maps the response back to a Result. Returns
+// AnthropicError on non-2xx responses.
 func AnthropicSendMessage(messages []core.Message, tools []tool.Tool, apiKey string) (Result, error) {
 	anthropicMessages := make([]anthropicMessage, 0, len(messages))
 	for _, m := range messages {
