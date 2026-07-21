@@ -1,0 +1,5 @@
+/sandbox/
+*.env
+.envrc
+/harness-lab
+.DS_Store
