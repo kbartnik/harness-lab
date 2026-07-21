@@ -52,7 +52,7 @@ func Run(send Send, tools []tool.Tool, messages []core.Message) ([]core.Message,
 
 			tResult, err := t.Execute(call.Args)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("tool %s: %w", call.Name, err)
 			}
 
 			messages = append(messages, core.Message{Role: "tool", ToolCallID: call.ID, Text: tResult.Output})

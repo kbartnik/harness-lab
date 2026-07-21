@@ -227,6 +227,7 @@ func TestAnthropicSendMessage(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, anthropicErr.StatusCode)
 		assert.Equal(t, "invalid api key", anthropicErr.Body)
+		assert.Equal(t, "anthropic api error: status 401: invalid api key", err.Error())
 	})
 }
 

@@ -13,6 +13,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type errTool struct{ err error }
+
+func (e errTool) Name() string           { return "fail" }
+func (e errTool) Description() string    { return "" }
+func (e errTool) Schema() map[string]any { return nil }
+func (e errTool) Execute(_ map[string]any) (core.ToolResult, error) {
+	return core.ToolResult{}, e.err
+}
+
 func TestRun(t *testing.T) {
 	t.Run("no tool calls", func(t *testing.T) {
 		calls := 0
@@ -135,6 +144,26 @@ func TestRun(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, core.Message{}, backing[1])
+	})
+
+	t.Run("tool execute error propagates", func(t *testing.T) {
+		executeErr := errors.New("disk full")
+
+		fakeSend := func(messages []core.Message, tools []tool.Tool) (provider.Result, error) {
+			return provider.Result{
+				Message: core.Message{
+					Role:      "assistant",
+					ToolCalls: []core.ToolCall{{ID: "call1", Name: "fail", Args: map[string]any{}}},
+				},
+				StopReason: "tool_use",
+			}, nil
+		}
+
+		_, err := Run(fakeSend, []tool.Tool{errTool{err: executeErr}}, []core.Message{
+			{Role: "user", Text: "hi"},
+		})
+
+		assert.ErrorIs(t, err, executeErr)
 	})
 
 	t.Run("max tool iterations exceeded", func(t *testing.T) {

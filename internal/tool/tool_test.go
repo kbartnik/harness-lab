@@ -191,3 +191,53 @@ func TestRead_Description(t *testing.T) {
 
 	assert.NotEmpty(t, result)
 }
+
+func TestRead(t *testing.T) {
+	t.Run("Name", func(t *testing.T) {
+		assert.Equal(t, "read", Read{}.Name())
+	})
+
+	t.Run("Schema", func(t *testing.T) {
+		assert.Equal(t, map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path": map[string]any{"type": "string"},
+			},
+			"required": []string{"path"},
+		}, Read{}.Schema())
+	})
+}
+
+func TestWrite(t *testing.T) {
+	t.Run("Name", func(t *testing.T) {
+		assert.Equal(t, "write", Write{}.Name())
+	})
+
+	t.Run("Schema", func(t *testing.T) {
+		assert.Equal(t, map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path":    map[string]any{"type": "string"},
+				"content": map[string]any{"type": "string"},
+			},
+			"required": []string{"path", "content"},
+		}, Write{}.Schema())
+	})
+}
+
+func TestToolError(t *testing.T) {
+	t.Run("unwrap preserves inner error for errors.Is", func(t *testing.T) {
+		sentinelError := errors.New("tool failed")
+		wrapped := &ToolError{Kind: KindNotFound, Err: sentinelError}
+
+		assert.ErrorIs(t, wrapped, sentinelError)
+	})
+
+	t.Run("unmatched error classification returns nil", func(t *testing.T) {
+		unknownErr := errors.New("some unexpected os error")
+
+		result := classifyFileError(unknownErr)
+
+		assert.Nil(t, result)
+	})
+}
