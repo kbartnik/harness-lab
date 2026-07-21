@@ -37,16 +37,6 @@ func errorResult(msg string) core.ToolResult {
 	return core.ToolResult{IsError: true, Output: msg}
 }
 
-// fileErrorResult converts an OS file error into a ToolResult. It tries to
-// classify the error into a known ErrorKind first; if that fails it falls back
-// to the raw error message so no information is lost.
-func fileErrorResult(err error) core.ToolResult {
-	if toolErr := classifyFileError(err); toolErr != nil {
-		return errorResult(toolErr.Error())
-	}
-	return errorResult(err.Error())
-}
-
 // classifyFileError maps a raw OS error to a ToolError with the appropriate
 // ErrorKind. Returns nil if the error doesn't match any known category, which
 // callers treat as a fallback to the raw message.
@@ -59,6 +49,16 @@ func classifyFileError(err error) *ToolError {
 	default:
 		return nil
 	}
+}
+
+// fileErrorResult converts an OS file error into a ToolResult. It tries to
+// classify the error into a known ErrorKind first; if that fails it falls back
+// to the raw error message so no information is lost.
+func fileErrorResult(err error) core.ToolResult {
+	if toolErr := classifyFileError(err); toolErr != nil {
+		return errorResult(toolErr.Error())
+	}
+	return errorResult(err.Error())
 }
 
 // resolveInSandbox joins root and requested into an absolute path and verifies

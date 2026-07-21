@@ -19,6 +19,27 @@ const (
 	anthropicMaxTokens = 4096
 )
 
+// Result is the provider-agnostic outcome of a single model call. It carries
+// the assistant Message, the stop reason, and token usage for the request.
+type Result struct {
+	Message      core.Message `json:"message"`
+	StopReason   string       `json:"stop_reason"`
+	InputTokens  int          `json:"input_tokens"`
+	OutputTokens int          `json:"output_tokens"`
+}
+
+// AnthropicError is returned when the Anthropic API responds with a non-2xx
+// status. StatusCode and Body are preserved so callers can inspect or log the
+// full API error response.
+type AnthropicError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *AnthropicError) Error() string {
+	return fmt.Sprintf("anthropic api error: status %d: %s", e.StatusCode, e.Body)
+}
+
 type anthropicRequest struct {
 	Model     string             `json:"model"`
 	MaxTokens int                `json:"max_tokens"`
@@ -58,58 +79,6 @@ type anthropicResponse struct {
 	Content    []anthropicContentBlock `json:"content"`
 	StopReason string                  `json:"stop_reason"`
 	Usage      anthropicUsage          `json:"usage"`
-}
-
-// Result is the provider-agnostic outcome of a single model call. It carries
-// the assistant Message, the stop reason, and token usage for the request.
-type Result struct {
-	Message      core.Message `json:"message"`
-	StopReason   string       `json:"stop_reason"`
-	InputTokens  int          `json:"input_tokens"`
-	OutputTokens int          `json:"output_tokens"`
-}
-
-// AnthropicError is returned when the Anthropic API responds with a non-2xx
-// status. StatusCode and Body are preserved so callers can inspect or log the
-// full API error response.
-type AnthropicError struct {
-	StatusCode int
-	Body       string
-}
-
-func (e *AnthropicError) Error() string {
-	return fmt.Sprintf("anthropic api error: status %d: %s", e.StatusCode, e.Body)
-}
-
-// resultFromResponse converts an Anthropic API response into a Result.
-// It iterates the content blocks, accumulating text blocks into a single string
-// and collecting tool_use blocks as ToolCalls.
-func resultFromResponse(resp anthropicResponse) Result {
-	var text strings.Builder
-	var toolCalls []core.ToolCall
-
-	for _, block := range resp.Content {
-		switch block.Type {
-		case "text":
-			text.WriteString(block.Text)
-		case "tool_use":
-			toolCalls = append(toolCalls, core.ToolCall{
-				ID:   block.ID,
-				Name: block.Name,
-				Args: block.Input,
-			})
-		}
-	}
-	return Result{
-		Message: core.Message{
-			Role:      "assistant",
-			Text:      text.String(),
-			ToolCalls: toolCalls,
-		},
-		StopReason:   resp.StopReason,
-		InputTokens:  resp.Usage.InputTokens,
-		OutputTokens: resp.Usage.OutputTokens,
-	}
 }
 
 // anthropicMessageFromCore converts a core.Message into the Anthropic wire
@@ -161,6 +130,37 @@ func anthropicToolFromTool(t tool.Tool) anthropicTool {
 		Name:        t.Name(),
 		Description: t.Description(),
 		InputSchema: t.Schema(),
+	}
+}
+
+// resultFromResponse converts an Anthropic API response into a Result.
+// It iterates the content blocks, accumulating text blocks into a single string
+// and collecting tool_use blocks as ToolCalls.
+func resultFromResponse(resp anthropicResponse) Result {
+	var text strings.Builder
+	var toolCalls []core.ToolCall
+
+	for _, block := range resp.Content {
+		switch block.Type {
+		case "text":
+			text.WriteString(block.Text)
+		case "tool_use":
+			toolCalls = append(toolCalls, core.ToolCall{
+				ID:   block.ID,
+				Name: block.Name,
+				Args: block.Input,
+			})
+		}
+	}
+	return Result{
+		Message: core.Message{
+			Role:      "assistant",
+			Text:      text.String(),
+			ToolCalls: toolCalls,
+		},
+		StopReason:   resp.StopReason,
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
 	}
 }
 

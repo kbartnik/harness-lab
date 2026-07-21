@@ -11,16 +11,6 @@ import (
 // "assistant" for model turns, and "tool" for tool-result turns.
 type Role string
 
-// Message is one turn in a conversation. Role determines how the message is
-// interpreted: user messages carry Text, assistant messages carry Text and/or
-// ToolCalls, and tool-result messages carry ToolCallID and Text (the output).
-type Message struct {
-	Role       Role       `json:"role"`
-	Text       string     `json:"text,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`   // present on assistant messages that call tools
-	ToolCallID string     `json:"tool_call_id,omitempty"` // present on tool-result messages
-}
-
 // ToolCall represents a request from the model to invoke a named tool with
 // the given arguments. ID is assigned by the provider and must be echoed back
 // in the corresponding tool-result Message.
@@ -38,6 +28,16 @@ type ToolResult struct {
 	ToolCallID string `json:"tool_call_id"`
 	Output     string `json:"output"`
 	IsError    bool   `json:"is_error,omitempty"`
+}
+
+// Message is one turn in a conversation. Role determines how the message is
+// interpreted: user messages carry Text, assistant messages carry Text and/or
+// ToolCalls, and tool-result messages carry ToolCallID and Text (the output).
+type Message struct {
+	Role       Role       `json:"role"`
+	Text       string     `json:"text,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`   // present on assistant messages that call tools
+	ToolCallID string     `json:"tool_call_id,omitempty"` // present on tool-result messages
 }
 
 // Turn is the instrumentation envelope for one five-step loop iteration. It carries
