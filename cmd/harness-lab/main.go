@@ -56,4 +56,9 @@ func main() {
 		fmt.Println(result[len(result)-1].Text)
 		fmt.Print("> ")
 	}
+
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, "read error:", err)
+		os.Exit(1)
+	}
 }
