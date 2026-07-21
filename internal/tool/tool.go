@@ -17,6 +17,10 @@ type Tool interface {
 	Execute(args map[string]any) (core.ToolResult, error)
 }
 
+func errorResult(msg string) core.ToolResult {
+	return core.ToolResult{IsError: true, Output: msg}
+}
+
 func resolveInSandbox(root, requested string) (string, error) {
 	if filepath.IsAbs(requested) {
 		return "", &ToolError{Kind: KindSandboxViolation, Err: fmt.Errorf("absolute paths not allowed: %s", requested)}
@@ -70,17 +74,17 @@ func (r Read) Execute(args map[string]any) (core.ToolResult, error) {
 
 	resolvedPath, err := resolveInSandbox(r.Root, path)
 	if err != nil {
-		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, nil
+		return errorResult(err.Error()), nil
 	}
 
 	contentBytes, err := os.ReadFile(resolvedPath)
 	if err != nil {
 		if toolErr := classifyFileError(err); toolErr != nil {
-			return core.ToolResult{ToolCallID: "", Output: toolErr.Error(), IsError: true}, nil
+			return errorResult(toolErr.Error()), nil
 		}
-		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, nil
+		return errorResult(err.Error()), nil
 	}
-	return core.ToolResult{ToolCallID: "", Output: string(contentBytes), IsError: false}, nil
+	return core.ToolResult{Output: string(contentBytes)}, nil
 }
 
 func classifyFileError(err error) *ToolError {
@@ -125,7 +129,7 @@ func (w Write) Execute(args map[string]any) (core.ToolResult, error) {
 
 	resolvedPath, err := resolveInSandbox(w.Root, path)
 	if err != nil {
-		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, nil
+		return errorResult(err.Error()), nil
 	}
 
 	content, err := requireStringArg(args, "content")
@@ -136,9 +140,9 @@ func (w Write) Execute(args map[string]any) (core.ToolResult, error) {
 	err = os.WriteFile(resolvedPath, []byte(content), 0o644)
 	if err != nil {
 		if toolErr := classifyFileError(err); toolErr != nil {
-			return core.ToolResult{ToolCallID: "", Output: toolErr.Error(), IsError: true}, nil
+			return errorResult(toolErr.Error()), nil
 		}
-		return core.ToolResult{ToolCallID: "", Output: err.Error(), IsError: true}, nil
+		return errorResult(err.Error()), nil
 	}
-	return core.ToolResult{ToolCallID: "", Output: "", IsError: false}, nil
+	return core.ToolResult{}, nil
 }
